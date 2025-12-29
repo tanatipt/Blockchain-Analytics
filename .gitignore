@@ -10,3 +10,4 @@ wheels/
 .venv
 secret.yaml
 result/
+data/
