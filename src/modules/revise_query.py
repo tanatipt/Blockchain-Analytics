@@ -1,9 +1,3 @@
-# TODO revise_query.py
-# Maybe add diffifculty classifier for question (easy , medium , hard) :
-# if  easy -> use only cot with 2 generation
-# if medium -> use cot, dac and qp with 2 generation each
-# if hard -> use cot, dac and qp with 3 generation each
-
 from src.modules.schemas import State, Step
 from langchain_core.prompts import ChatPromptTemplate
 from src.modules.format_light_schema import format_light_schema
@@ -165,7 +159,18 @@ Correcting the potential case sensitivity issue and ensuring the query is accura
 SELECT COUNT(T3.id) FROM games_city AS T1 INNER JOIN city AS T2 ON T1.city_id = T2.id INNER JOIN games AS T3 ON T1.games_id = T3.id WHERE T2.city_name = 'London' AND T3.games_year BETWEEN 1900 AND 1992
 """
 
-async def revise_query(state : State, llm : BaseChatModel):
+async def revise_query(state : State, llm : BaseChatModel) -> State:
+    """
+    Revise and correct SQL queries that previously failed execution.
+
+    Args:
+        state (State): State of the Langchain graph
+        llm (BaseChatModel): Language model instance
+
+    Returns:
+        State: State of the Langchain graph
+    """
+    # Obtain the failed queries and their results
     failed_queries = state.failed_queries
     question = state.question
     selected_schema = format_light_schema(table_information=state.selected_schema, include_column_info=True)
@@ -178,6 +183,7 @@ async def revise_query(state : State, llm : BaseChatModel):
         ]
     )
 
+    # Preparing batch inputs to correct all failed queries
     batch_inputs = [
         {
             "database_schema": selected_schema,
@@ -192,6 +198,7 @@ async def revise_query(state : State, llm : BaseChatModel):
     revise_sql_chain = revise_sql_pt | llm.with_structured_output(ReviseOutput)
     results = await revise_sql_chain.abatch(batch_inputs)
     sql_queries = {r.revised_query for r in results}
+    # Add the revised queries to the list of pending queries to be executed and increment the revision count
     return {
         "pending_queries" : sql_queries, 
         "revision_count" : state.revision_count + 1

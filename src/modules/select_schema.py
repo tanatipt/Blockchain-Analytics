@@ -4,9 +4,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from google.cloud.bigquery import Client
 from src.modules.format_light_schema import format_light_schema
-from langchain_openai import ChatOpenAI
 import numpy as np
-from config import settings
 
 np.random.seed(12345)
 
@@ -74,28 +72,18 @@ Output only the tables and columns that are strictly necessary to write an effec
 that are not required — **except** primary keys and foreign keys, which must always be included when their table appears in the output. If you include unnecessary tables
 or columns (other than keys), you will be fined $2000 and imprisoned for 10 years, so you must respond with extreme caution and accuracy.
 """
-
-def retrieve_column_sample(client: Client, schema_info: dict):
-    query_template = """SELECT * FROM `{table_id}` TABLESAMPLE SYSTEM (0.1 PERCENT) LIMIT 4000"""
-
-    for table_id, table_info in schema_info.items():
-        formatted_query = query_template.format(table_id=table_id )
-        samples = client.query(formatted_query).to_dataframe()
-        for column in table_info["columns"]:
-            try:
-                column_name = column["name"]
-                unique_vals = samples[column_name].dropna().unique()
-                sample_size = min(3, len(unique_vals))
-                random_samples = np.random.choice(unique_vals, size=sample_size, replace=False).tolist()
-            except Exception as e:
-                #raise e
-                random_samples = []
-            finally:
-                column["sample_values"] = random_samples
-
-    return schema_info
         
 def extract_schema_info(client: Client, dataset_id: str) -> dict:
+    """
+    Extract schema information of all tables from a specified dataset/database.
+
+    Args:
+        client (Client): BigQuery client instance
+        dataset_id (str): Dataset/Database ID
+
+    Returns:
+        dict: A dictionary containing schema information for each table in the dataset.
+    """
     schema_info = {}
     tables = client.list_tables(dataset_id)
 
@@ -129,13 +117,21 @@ def extract_schema_info(client: Client, dataset_id: str) -> dict:
             "primary_key": primary_keys,
             "foreign_key": foreign_keys,
         }
-
-    #schema_info = retrieve_column_sample(client , schema_info)
     return schema_info
 
 
 
 def filter_selected_schema(schema_info: dict, selected_schema: list) -> dict:
+    """
+    Filter the schema information of the entire database/dataset into a specified subset
+
+    Args:
+        schema_info (dict): Full schema information of the database/dataset
+        selected_schema (list): List of selected tables and their required columns
+
+    Returns:
+        dict: Filtered schema information containing only the selected tables and their required columns.
+    """
     selected_schema_info = {}
 
     for sel in selected_schema:
@@ -155,11 +151,21 @@ def filter_selected_schema(schema_info: dict, selected_schema: list) -> dict:
     return selected_schema_info
 
 
-async def select_schema(state : State, llm : BaseChatModel, client : Client):
+async def select_schema(state : State, llm : BaseChatModel, client : Client) -> State:
+    """
+    Select the relevant database schema (tables and columns) for a given question.
+    Args:
+        state (State): State of the Langchain graph
+        llm (BaseChatModel): Language model instance
+        client (Client): BigQuery client instance
+    Returns:
+        State: State of the Langchain graph"
+    """
     question = state.question
     dataset_id = state.dataset_id
-
+    # Extract full schema information from the dataset
     schema_info = extract_schema_info(client, dataset_id)
+    # Format schema information for prompt
     schema_info_md = format_light_schema(table_information=schema_info, include_column_info= True)
     schema_selector_pt = ChatPromptTemplate(
         [
@@ -167,29 +173,12 @@ async def select_schema(state : State, llm : BaseChatModel, client : Client):
             ('user', """<database_schema>: {database_schema}\n<user_question>: {question}""")
         ]
     )
+    # Create schema selector chain
     schema_selector_chain = schema_selector_pt | llm.with_structured_output(TableColumnSelectorOutput)
+    # Invoke chain to select relevant schema
     response = await schema_selector_chain.ainvoke({"database_schema" : schema_info_md, "question" : question})
     selected_schema = response.selected_schema
+    # Filter full schema information to only include selected tables and columns
     selected_schema_info = filter_selected_schema(schema_info, selected_schema)
 
     return {"selected_schema" : selected_schema_info}
-    
-
-
-
-
-if __name__ == "__main__":
-    import os
-    os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-    os.environ["LANGSMITH_API_KEY"] = settings.LANGSMITH_API_KEY
-    os.environ["LANGSMITH_TRACING"] = settings.LANGSMITH_TRACING
-    os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT
-    print(settings.LANGSMITH_API_KEY, settings.LANGSMITH_TRACING, settings.LANGSMITH_PROJECT)
-
-    llm = ChatOpenAI(model = "gpt-4.1-mini", temperature = 0.0, top_p = 0.0)
-    schema_subset = select_schema(
-        state = State(question = "What was the address that had the most transactions on 20-11-2025?", dataset_id='bigquery-public-data.crypto_ethereum', selected_schema = {}),
-        llm = llm,
-        client = Client()
-    )
-    #print(schema_subset)

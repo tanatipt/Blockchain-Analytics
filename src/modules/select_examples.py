@@ -1,12 +1,8 @@
 from src.modules.schemas import State, Step
 from langchain_community.vectorstores import OpenSearchVectorSearch
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from pydantic import BaseModel, Field
-import os
-from config import settings
 
 
 class SkeletonOutput(BaseModel):
@@ -58,7 +54,19 @@ When extracting the question skeleton, you **must**:
 <skeleton>: Calculate the difference in the average number of <COLUMN> in each month of <YEAR> and <YEAR>.
 """
 
-async def select_examples(state : State, opensearch : OpenSearchVectorSearch, llm : BaseChatModel):
+async def select_examples(state : State, opensearch : OpenSearchVectorSearch, llm : BaseChatModel) -> State:
+    """
+
+    Select the most relevant few-shot text-to-SQL examples for a given question by using vector search over a vector database.
+
+    Args:
+        state (State): State of the Langchain graph
+        opensearch (OpenSearchVectorSearch): OpenSearch vector search instance
+        llm (BaseChatModel): Language model instance
+
+    Returns:
+        State: State of the Langchain graph
+    """
     question = state.question
     extract_skeleton_pt = ChatPromptTemplate(
         [
@@ -66,39 +74,10 @@ async def select_examples(state : State, opensearch : OpenSearchVectorSearch, ll
             ('user', '<question>: {question}\n<skeleton>:')
         ]
     )
-
+    # Extracting the question skeleton
     extract_skeleton_chain = extract_skeleton_pt | llm.with_structured_output(SkeletonOutput)
     response = await extract_skeleton_chain.ainvoke({"question" : question})
     question_skeleton = response.question_skeleton
+    # Performing vector search using the question skeleton and retrieving top 5 relevant examples
     docs = await opensearch.asimilarity_search(query = question_skeleton, k = 5)
     return {"few_shot_examples" : [(doc.metadata['question'], doc.metadata['sql']) for doc in docs]}
-
-
-if __name__ == "__main__":
-    import os
-    os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-    os.environ["LANGSMITH_API_KEY"] = settings.LANGSMITH_API_KEY
-    os.environ["LANGSMITH_TRACING"] = settings.LANGSMITH_TRACING
-    os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT
-    os.environ["GOOGLE_API_KEY"] = settings.GOOGLE_API_KEY
-    print(settings.LANGSMITH_API_KEY, settings.LANGSMITH_TRACING, settings.LANGSMITH_PROJECT)
-    
-
-    embedder = GoogleGenerativeAIEmbeddings(model = "gemini-embedding-001")
-    print(type(embedder))
-    opensearch = OpenSearchVectorSearch(
-        embedding_function=embedder,
-        http_auth=(settings.OPENSEARCH_USER, settings.OPENSEARCH_PASS),
-        **settings.opensearch
-    )
-    state = State(
-        question = "What was the address that had the most transactions on 20-11-2025?", 
-        dataset_id='bigquery-public-data.crypto_ethereum', 
-        selected_schema = {},
-        few_shot_examples=[]
-    )
-
-    llm = ChatOpenAI(model = "gpt-4.1-mini", temperature = 0.0, top_p = 0.0)
-    few_shot_examples = select_examples(state, opensearch, llm)
-
-    print(few_shot_examples)

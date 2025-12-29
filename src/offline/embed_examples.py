@@ -8,19 +8,21 @@ import os
 from tqdm import tqdm
 
 
-
+# Python script to embed few-shot text-to-SQL examples and upload to OpenSearch
 if __name__ == "__main__":
     os.environ["GOOGLE_API_KEY"] = settings.GOOGLE_API_KEY
-
+    # Loading text-to-SQL examples from the BIRD benchmark
     data_path = "data/bird_train.json"
     bird_train = json.load(open(data_path, "r"))
     bulk_size = 500
     docs = []
 
+    # Iterate through examples and create Document objects
     for example in bird_train:
         example_doc = Document(page_content=example["skeleton"], metadata={"question" : example["question"], "sql" : example["sql"]})
         docs.append(example_doc)
 
+    # Batch embedding and uploading to OpenSearch
     num_batches = int(np.ceil(len(docs) / bulk_size))
     embedder = GoogleGenerativeAIEmbeddings(model = "gemini-embedding-001")
     opensearch_vs = OpenSearchVectorSearch(

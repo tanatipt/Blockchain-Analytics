@@ -2,7 +2,7 @@ from src.modules.schemas import State, Step
 from langchain_core.language_models import BaseChatModel
 from src.modules.format_light_schema import format_light_schema
 from langchain_core.prompts import ChatPromptTemplate
-from src.modules.common_prompt import database_optimisation
+from src.modules.common_prompt import database_guidelines, question_guidelines, eth_knowledge
 from config import settings
 from pydantic import BaseModel, Field
 
@@ -78,7 +78,14 @@ operations performed on the data. A query plan consists of at least three steps:
 2. Performing operations such as counting, filtering, or matching between tables.
 3. Delivering the final result by selecting the appropriate columns to return. All column names in the optimised SQL query **must be enclosed** with `...`.
 
-Follow these guidelines to help you construct the query plan and the final SQL query: {database_optimisation}
+Use the following database guidelines to generate, assemble, and optimize SQL queries:
+{database_guidelines}
+
+Use the following question guidelines to correctly interpret the intent and meaning of each question before generating the SQL:
+{question_guidelines}
+
+The following background information about the Ethereum blockchain may be useful:
+{ethereum_knowledge}
 
 # Example
 <question>: How many Thai restaurants can be found in San Pablo Ave, Albany?
@@ -116,8 +123,20 @@ ON `T1.id_restaurant` = `T2.id_restaurant` WHERE `T1.food_type` = `thai` AND `T1
 `T2.street_name` = `san pablo ave`
 """
 
-async def generate_qp_sql(state: State, llm : BaseChatModel): 
+async def generate_qp_sql(state: State, llm : BaseChatModel) -> State: 
+    """
+    Generates SQL queries using Query Planning approach
+
+    Args:
+        state (State): State of the Langchain graph
+        llm (BaseChatModel): Language model instance
+
+    Returns:
+        State: State of the Langchain graph
+    """
+    # Formatting the most relevant few-shot examples to the user's question
     few_shot_examples = "\n\n".join([f"<user_question>: {example_question}\n<sql>: {example_sql}" for example_question, example_sql in state.few_shot_examples])
+    # Formatting the selected database schema into a Light Schema format
     selected_schema = format_light_schema(table_information=state.selected_schema, include_column_info=True)
     question = state.question
 
@@ -129,19 +148,23 @@ async def generate_qp_sql(state: State, llm : BaseChatModel):
     )
 
     generate_sql_chain = generate_sql_pt | llm.with_structured_output(QueryPlanningOutput)
+    # Generating `n` different SQL queries using the query planning approach
     n = settings.self_consistency.query_planning
-
 
     batch_inputs = [
         {
             "few_shot_examples": few_shot_examples,
             "database_schema": selected_schema,
             "question": question,
-            "database_optimisation": database_optimisation,
+            "database_guidelines": database_guidelines,
+            "question_guidelines" : question_guidelines,
+            "ethereum_knowledge": eth_knowledge
         }
         for _ in range(n)
     ]
 
     results = await generate_sql_chain.abatch(batch_inputs)
     sql_queries = {r.final_sql for r in results}
+
+    # Add the `n` queries generated to the list of pending queries to be executed
     return {"pending_queries" : sql_queries}

@@ -1,6 +1,6 @@
 default:
-  input_path : data/eval_dataset.csv
-  output_path: result/eval_result.csv
+  input_path : data/eth_qa_dataset.csv
+  output_path: result/eval_result_model_v1.csv
   dataset_id : bigquery-public-data.crypto_ethereum
 
   embedder:
@@ -30,15 +30,15 @@ default:
       provider: openai
       params:
         model: gpt-4.1-mini
-        temperature : 0.9
-        top_p : 0.9
+        temperature : 0.0
+        top_p : 0.0
     
 
 
   self_consistency:
-    divide_and_conquer : 2
-    query_planning: 2
-    roleplay : 2
+    divide_and_conquer : 1
+    query_planning: 1
+    roleplay : 1
 
   max_revision_count : 5
 

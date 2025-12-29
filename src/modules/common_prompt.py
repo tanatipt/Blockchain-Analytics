@@ -1,4 +1,12 @@
-database_optimisation = """
+# Prompt for common knowledge of Ethereum
+eth_knowledge = """
+- 1 ETH equals 1e18 Wei
+- 1 Gwei equals 1e9 Wei
+- 1 ETH equals 1e Gwei
+"""
+
+# Prompt for SQL generation guidelines
+database_guidelines = """
 - **SELECT Clause**
     - Only select columns mentioned in the user's question.
     - Avoid unnecessary columns or values.
@@ -20,5 +28,11 @@ database_optimisation = """
     specific decimal places or percentage representation . These are not just suggestions
     ; they are critical parts of the final answer and must be implemented using
     appropriate SQL functions ( e . g . , ROUND () and multiplying by 100) .
-    - Use `ROUND ()` to round the result to a specific number.
+    - If no formatting requirements are specified, return the raw value and do not use `ROUND()` or any other formatting functions.
+"""
+
+# Prompt for question answering and interpretation guidelines
+question_guidelines = """
+- When a question requests an aggregate value over the last X time units (days, hours, weeks, or years), the current day, hour, week, or year must be excluded from the calculation because it is an incomplete time period and would bias the resulting aggregate.
+- If the question does not specify a unit for a quantity or measurement, return the value in the unit stored in the database without performing any conversion. If a unit is specified, convert the stored value to the requested unit.
 """

@@ -2,7 +2,7 @@ from src.modules.schemas import State
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from src.modules.format_light_schema import format_light_schema
-from src.modules.common_prompt import database_optimisation
+from src.modules.common_prompt import database_guidelines, question_guidelines, eth_knowledge
 from pydantic import BaseModel, Field
 from config import settings
 
@@ -55,7 +55,7 @@ They:
 - Encourage the student to justify choices like join order, filtering strategy, and scan paths  
 - Push for clarity, correctness, and an optimal relational-algebra approach  
 - Ensure the student's final SQL is accurate and efficient
-Usually, the profressor follows the following guidelines when providing feedback: {database_optimisation}
+Usually, the profressor follows the following guidelines when providing feedback: {database_guidelines}
 Both personas are deeply motivated, collaborative, and committed to solving difficult SQL-generation problems with precision.
 
 # Scenario
@@ -84,10 +84,28 @@ The conversation **must always** obey the following rules at all times:
 - **The student is the only persona allowed to construct the final SQL query.**  
 - The conversation continues until the solution reaches a high-quality final SQL query.  
 - The tone is academic, focused, and highly technical.
+
+Use the following question guidelines to correctly interpret the intent and meaning of each question before generating the SQL:
+{question_guidelines}
+
+The following background information about the Ethereum blockchain may be useful:
+{ethereum_knowledge}
 """
 
-async def generate_rp_sql(state : State, llm : BaseChatModel):
+async def generate_rp_sql(state : State, llm : BaseChatModel) -> State:
+    """
+    Generates SQL queries using the Roleplaying approach
+
+    Args:
+        state (State): State of the Langchain graph
+        llm (BaseChatModel): Language model instance
+
+    Returns:
+        State: State of the Langchain graph
+    """
+    # Formatting the most relevant few-shot examples to the user's question
     few_shot_examples = "\n\n".join([f"<user_question>: {example_question}\n<sql>: {example_sql}" for example_question, example_sql in state.few_shot_examples])
+    # Formatting the selected database schema into a Light Schema format
     selected_schema = format_light_schema(table_information=state.selected_schema, include_column_info=True)
     question = state.question
 
@@ -99,19 +117,23 @@ async def generate_rp_sql(state : State, llm : BaseChatModel):
     )
 
     generate_sql_chain = generate_sql_pt | llm.with_structured_output(RoleplayOutput)
+     # Generating `n` different SQL queries using the role playing approach
     n = settings.self_consistency.roleplay
-
 
     batch_inputs = [
         {
             "few_shot_examples": few_shot_examples,
             "database_schema": selected_schema,
             "question": question,
-            "database_optimisation": database_optimisation,
+            "database_guidelines": database_guidelines,
+            "question_guidelines" : question_guidelines,
+            "ethereum_knowledge": eth_knowledge
         }
         for _ in range(n)
     ]
 
     results = await generate_sql_chain.abatch(batch_inputs)
     sql_queries = {r.final_sql for r in results}
+
+    # Add the `n` queries generated to the list of pending queries to be executed
     return {"pending_queries" : sql_queries}

@@ -20,7 +20,7 @@ def get_class(map_type: Literal['llm', 'vectorstore', 'embedding'], name: str) -
     """
     Retrieves the class corresponding to the given mapping type and name.
     Args:
-        map_type (Literal[splitter, llm, vectorstore, lexicalstore, embedding, reranker]): Type of the mapping
+        map_type (Literal['llm', 'vectorstore', 'embedding']): Type of the mapping
         name (str): Name of the class to retrieve
 
     Raises:

@@ -21,6 +21,15 @@ class GraphConstructor:
         opensearch: OpenSearchVectorSearch,
         bigquery_client : Client
     ):
+        """
+        Initialises our text-to-SQL model
+
+        Args:
+            factual_llm (BaseChatModel): Factual language model instance
+            creative_llm (BaseChatModel): Creative language model instance
+            opensearch (OpenSearchVectorSearch): OpenSearch vector search instance
+            bigquery_client (Client): BigQuery client instance
+        """
         self.select_examples = self.init_node(select_examples, opensearch = opensearch, llm = factual_llm)
         self.select_schema = self.init_node(select_schema, client = bigquery_client, llm = factual_llm)
         self.generate_dac_sql = self.init_node(generate_dac_sql, llm = creative_llm)
@@ -105,7 +114,7 @@ class GraphConstructor:
         Args:
             save_path (str, optional): Path to save the graph visualization. Defaults to None.
         Returns:
-            StateGraph: The compiled RAG architecture graph."""
+            CompiledStateGraph: The compiled RAG architecture graph."""
         workflow = self.connect_nodes()
         graph = workflow.compile()
 
