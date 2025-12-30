@@ -2,7 +2,7 @@
 eth_knowledge = """
 - 1 ETH equals 1e18 Wei
 - 1 Gwei equals 1e9 Wei
-- 1 ETH equals 1e Gwei
+- 1 ETH equals 1e9 Gwei
 """
 
 # Prompt for SQL generation guidelines

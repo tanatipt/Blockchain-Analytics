@@ -1,5 +1,5 @@
 from langchain_core.language_models import BaseChatModel
-from langchain_community.vectorstores.opensearch_vector_search import OpenSearchVectorSearch
+from langchain_community.vectorstores import OpenSearchVectorSearch
 from google.cloud.bigquery import Client
 from src.modules.schemas import State
 from langgraph.graph.state import CompiledStateGraph, StateGraph, START, END
@@ -119,7 +119,8 @@ class GraphConstructor:
         graph = workflow.compile()
 
         if save_path is not None:
-            png_graph = graph.get_graph().draw_mermaid_png()
+            print(type(graph.get_graph()))
+            png_graph = graph.get_graph(xray = 1).draw_mermaid_png()
 
             with open(save_path, "wb") as f:
                 f.write(png_graph)

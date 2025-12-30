@@ -305,8 +305,8 @@ if __name__ == "__main__":
         factual_llm=factual_llm,
         bigquery_client=bigquery_client
     )
-    graph = graph_builder.compile()
-    baseline = baseline_builder.compile()
+    graph = graph_builder.compile(save_path= "resources/graph.png")
+    baseline = baseline_builder.compile(save_path= "resources/baseline.png")
 
     # Initialize evaluation pipeline
     pipeline = EvaluationPipeline(
@@ -318,7 +318,7 @@ if __name__ == "__main__":
 
     # Evaluate the graph and baseline
     #asyncio.run(pipeline.evaluate(baseline))
-    asyncio.run(pipeline.evaluate(graph))
+    #asyncio.run(pipeline.evaluate(graph))
 
 
 
