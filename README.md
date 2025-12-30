@@ -61,8 +61,8 @@ The dataset was constructed using the following process:
 <table>
   <thead>
     <tr>
-      <th width="30%">Question</th>
-      <th width="70%">Ground Truth SQL</th>
+      <th width="50%">Question</th>
+      <th width="50%">Ground Truth SQL</th>
     </tr>
   </thead>
   <tbody>
