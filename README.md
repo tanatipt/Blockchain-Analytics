@@ -1,4 +1,4 @@
-# Blockchain-Analytics
+# Blockchain Analytics
 In this project, we developed a text-to-SQL chatbot for blockchain analytics that allows users to interact with and query on-chain data to gain insights into network utilisation and activity. We focus specifically on the Ethereum blockchain, as it is one of the most widely used platforms; however, the system can be easily extended to other blockchains by modifying the prompt and database configuration. Given a user question, the chatbot operates through the following core components:
 
 1. **Schema Linking**: The system filters the database schema to identify only the tables and columns relevant to the user’s question. At the same time, it retrieves semantically similar text-to-SQL examples from a vector database to serve as few-shot demonstrations that guide SQL generation.
@@ -58,14 +58,87 @@ The dataset was constructed using the following process:
 
 ## Sample Questions
 
-| Question | Ground Truth SQL |
-|---------|------------------|
-| What are the per-day average base fee per gas and total gas used on Ethereum for the last 30 days? | <pre><code>SELECT<br>  DATE(timestamp) AS date,<br>  AVG(base_fee_per_gas) AS avg_base_fee,<br>  SUM(gas_used) AS total_gas_used<br>FROM `bigquery-public-data.crypto_ethereum.blocks`<br>WHERE DATE(timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)<br>  AND DATE(timestamp) < CURRENT_DATE()<br>GROUP BY date<br>ORDER BY date ASC;</code></pre> |
-| Which 10 miners have mined the most blocks? | <pre><code>SELECT miner<br>FROM `bigquery-public-data.crypto_ethereum.blocks`<br>GROUP BY miner<br>ORDER BY COUNT(*) DESC<br>LIMIT 10;</code></pre> |
-| Find the average gas used by transactions after 1 December 2025 that interacted with ERC-721 (NFT) contracts, compared with non-NFT contracts. | <pre><code>SELECT<br>  c.is_erc721,<br>  AVG(tx.receipt_gas_used) AS avg_gas<br>FROM `bigquery-public-data.crypto_ethereum.transactions` tx<br>JOIN `bigquery-public-data.crypto_ethereum.contracts` c<br>  ON tx.to_address = c.address<br>WHERE tx.block_timestamp >= '2025-12-01'<br>  AND c.is_erc721 IS NOT NULL<br>GROUP BY c.is_erc721;</code></pre> |
-| Which 10 days of the year have historically had the highest average gas used per Ethereum block, and what is the average gas used per block for each of those days? | <pre><code>SELECT<br>  EXTRACT(DAYOFYEAR FROM timestamp) AS day_of_year,<br>  AVG(gas_used) AS avg_gas_used<br>FROM `bigquery-public-data.crypto_ethereum.blocks`<br>WHERE gas_used IS NOT NULL<br>GROUP BY day_of_year<br>ORDER BY avg_gas_used DESC<br>LIMIT 10;</code></pre> |
-| Which ERC-20 tokens were created in the last 30 days, and what are their names and symbols? Exclude any tokens with missing name or symbol. | <pre><code>SELECT DISTINCT t.name, t.symbol<br>FROM `bigquery-public-data.crypto_ethereum.contracts` c<br>JOIN `bigquery-public-data.crypto_ethereum.tokens` t<br>  ON c.address = t.address<br>WHERE DATE(c.block_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)<br>  AND DATE(c.block_timestamp) < CURRENT_DATE()<br>  AND c.is_erc20 = TRUE<br>  AND t.name IS NOT NULL<br>  AND t.symbol IS NOT NULL<br>ORDER BY t.name, t.symbol;</code></pre> |
-
+<table>
+  <thead>
+    <tr>
+      <th width="30%">Question</th>
+      <th width="70%">Ground Truth SQL</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>What are the per-day average base fee per gas and total gas used on Ethereum for the last 30 days?</td>
+      <td>
+<pre lang="sql">
+SELECT 
+  DATE(timestamp) AS date,
+  AVG(base_fee_per_gas) AS avg_base_fee,
+  SUM(gas_used) AS total_gas_used
+FROM `bigquery-public-data.crypto_ethereum.blocks`
+WHERE  
+    DATE(timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+    AND DATE(timestamp) < CURRENT_DATE()
+GROUP BY date
+ORDER BY date ASC;</pre>
+      </td>
+    </tr>
+    <tr>
+      <td>Which 10 miners have mined the most blocks?</td>
+      <td>
+<pre lang="sql">
+SELECT 
+  miner
+FROM `bigquery-public-data.crypto_ethereum.blocks`
+GROUP BY miner
+ORDER BY COUNT(*) DESC
+LIMIT 10;</pre>
+      </td>
+    </tr>
+    <tr>
+      <td>Find the average gas used by transactions after 1 December 2025 that interacted with ERC-721 (NFT) contracts, compared with non-NFT contracts.</td>
+      <td>
+<pre lang="sql">
+SELECT 
+  c.is_erc721, 
+  AVG(tx.receipt_gas_used) as avg_gas
+FROM `bigquery-public-data.crypto_ethereum.transactions` tx
+JOIN `bigquery-public-data.crypto_ethereum.contracts` c 
+  ON tx.to_address = c.address
+WHERE tx.block_timestamp >= '2025-12-01' AND c.is_erc721 IS NOT NULL
+GROUP BY c.is_erc721;</pre>
+      </td>
+    </tr>
+    <tr>
+      <td>Which 10 days of the year have historically had the highest average gas used per Ethereum block, and what is the average gas used per block for each of those days?</td>
+      <td>
+<pre lang="sql">
+SELECT 
+  EXTRACT(DAYOFYEAR FROM timestamp) as day_of_year,
+  AVG(gas_used) as total_gas_used
+FROM `bigquery-public-data.crypto_ethereum.blocks`
+WHERE gas_used IS NOT NULL
+GROUP BY day_of_year
+ORDER BY total_gas_used DESC
+LIMIT 10;</pre>
+      </td>
+    </tr>
+    <tr>
+      <td>Which ERC-20 tokens were created in the last 30 days, and what are their names and symbols? Exclude any tokens with missing name or symbol.</td>
+      <td>
+<pre lang="sql">
+SELECT 
+  DISTINCT t.name, t.symbol
+FROM `bigquery-public-data.crypto_ethereum.contracts` c
+JOIN `bigquery-public-data.crypto_ethereum.tokens` t 
+  ON c.address = t.address
+WHERE DATE(c.block_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+    AND DATE(c.block_timestamp) < CURRENT_DATE() AND t.name IS NOT NULL and t.symbol IS NOT NULL
+    AND c.is_erc20 = TRUE AND t.name IS NOT NULL AND t.symbol IS NOT NULL
+ORDER BY t.name, t.symbol;</pre>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 # Methodology
 
@@ -78,7 +151,7 @@ Our text-to-SQL chatbot is heavily inspired by prior work on general-purpose tex
 The diagram below illustrates the pipeline of our text-to-SQL chatbot. The first two nodes form subgraphs responsible for schema linking and initial SQL generation, while the subsequent nodes handle SQL revision and candidate selection.
 
 <p align="center">
-    <img src='resources/graph.png' width="30%">
+    <img src='resources/graph.png' width="50%">
 </p>
 
 ## Context Retrieval
