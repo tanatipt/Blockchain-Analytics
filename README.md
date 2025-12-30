@@ -61,7 +61,7 @@ The dataset was constructed using the following process:
 <table>
   <thead>
     <tr>
-      <th width="50%" style="min-width: 400px;">Question</th>
+      <th width="50%">Question</th>
       <th width="50%">Ground Truth SQL</th>
     </tr>
   </thead>
@@ -69,7 +69,6 @@ The dataset was constructed using the following process:
     <tr>
       <td>What are the per-day average base fee per gas and total gas used on Ethereum for the last 30 days?</td>
       <td>
-<pre lang="sql">
 SELECT 
   DATE(timestamp) AS date,
   AVG(base_fee_per_gas) AS avg_base_fee,
@@ -85,7 +84,6 @@ ORDER BY date ASC;</pre>
     <tr>
       <td>Which 10 miners have mined the most blocks?</td>
       <td>
-<pre lang="sql">
 SELECT 
   miner
 FROM `bigquery-public-data.crypto_ethereum.blocks`
@@ -97,7 +95,6 @@ LIMIT 10;</pre>
     <tr>
       <td>Find the average gas used by transactions after 1 December 2025 that interacted with ERC-721 (NFT) contracts, compared with non-NFT contracts.</td>
       <td>
-<pre lang="sql">
 SELECT 
   c.is_erc721, 
   AVG(tx.receipt_gas_used) as avg_gas
@@ -111,7 +108,6 @@ GROUP BY c.is_erc721;</pre>
     <tr>
       <td>Which 10 days of the year have historically had the highest average gas used per Ethereum block, and what is the average gas used per block for each of those days?</td>
       <td>
-<pre lang="sql">
 SELECT 
   EXTRACT(DAYOFYEAR FROM timestamp) as day_of_year,
   AVG(gas_used) as total_gas_used
@@ -125,7 +121,6 @@ LIMIT 10;</pre>
     <tr>
       <td>Which ERC-20 tokens were created in the last 30 days, and what are their names and symbols? Exclude any tokens with missing name or symbol.</td>
       <td>
-<pre lang="sql">
 SELECT 
   DISTINCT t.name, t.symbol
 FROM `bigquery-public-data.crypto_ethereum.contracts` c
@@ -296,10 +291,37 @@ After the SQL revision stage, we obtain a dictionary of successfully executed SQ
 
 # Evaluation
 
-## Evaluation Metric
+In this section, we describe how we evaluated our text-to-SQL chatbot on the dataset. We first define the evaluation metrics used to quantify the chatbot’s performance. Next, we introduce the baseline chatbot against which our approach is compared. Finally, we present and analyse the evaluation results.
 
+## Evaluation Metrics
+
+We use the following comprehensive set of metrics to evaluate both our chatbot and the baseline chatbot on each question in the dataset:
+
+| Metric | Description |
+|------|-------------|
+| Soft F1-Score | The primary metric for evaluating SQL correctness. It measures the similarity between the result tables produced by the generated SQL query and those produced by the ground-truth SQL, while ignoring column order, column name and missing values. More details on its computation can be found [here](https://github.com/bird-bench/mini_dev). |
+| SQL Validity | A binary indicator of whether the generated SQL query can be successfully executed on BigQuery (0 = cannot be executed, 1 = can be executed). This metric helps identify syntactic correctness. |
+| Gigabytes Processed | The amount of data processed by the SQL query during execution. This metric reflects the query’s processing efficiency, as more efficient queries typically process fewer bytes. |
+| Time Elapsed | The total time required for the chatbot to generate an SQL query for a given question. This metric indicates the system’s responsiveness and latency. |
+| Token Usage | The number of tokens consumed by the chatbot when generating an SQL query. This metric serves as a proxy for cost efficiency. |
 
 ## Baseline Model
+
+Our baseline chatbot is intentionally simple and intuitive, as illustrated in the diagram below. First, the schema of the entire Ethereum database is extracted from BigQuery and provided directly to the LLM. The LLM then generates an SQL query based solely on this full schema and the user question.
+
+Notably, the baseline does not perform schema linking to filter or prioritise relevant tables and columns, nor does it employ any form of chain-of-thought or structured reasoning during SQL generation.
+
+<p align="center">
+    <img src="resources/baseline.png" width="30%">
+</p>
+
+
+
+
 ## Evaluation Result
 
+TBD
+
 # Installation & Project Setup
+
+TBD
